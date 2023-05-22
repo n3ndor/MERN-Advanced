@@ -12,6 +12,16 @@ function Chat() {
 
     useEffect(() => {
         socket = io(CONNECTION_PORT);
+
+        //oldMessages
+        socket.on("chat history", (data) => {
+            setMessageList(data);
+        });
+
+        //newMessages
+        socket.on("message", (data) => {
+            setMessageList((newMessages) => [...newMessages, data]);
+        });
     }, []);
 
     // Join the chatroom
@@ -25,12 +35,6 @@ function Chat() {
         setUsername("");
         setMessageList([]);
     };
-
-    useEffect(() => {
-        socket.on("message", (data) => {
-            setMessageList([...messageList, data]);
-        });
-    });
 
     const sendMessage = async () => {
         let messageContent = {

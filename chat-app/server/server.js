@@ -8,6 +8,9 @@ const userRoutes = require('./routes/User.routes');
 const { expressjwt } = require('express-jwt');
 const jwt = require('jsonwebtoken');
 
+const Message = require('./models/Message.models');
+const connectedUsers = {};
+
 // JWT error handling middleware
 const jwtError = function (err, req, res, next) {
     if (err.name === 'UnauthorizedError') {
@@ -19,10 +22,12 @@ const app = express();
 
 // Configuring CORS
 const corsOptions = {
-    origin: 'http://localhost:3000',
+    origin: true,
     credentials: true,
+    methods: ["GET", "POST"], //"PUT" for editing
+    allowedHeaders: ["*"]
 };
-app.use(cors(corsOptions));
+app.use(cors({ credentials: true, origin: true }));
 
 // Body parser middleware
 app.use(express.json());
@@ -54,17 +59,23 @@ const io = socketio(server, {
 io.on('connection', (socket) => {
     console.log('New WebSocket connection');
 
-    socket.on('join', ({ username }) => {
+    // When a new user joins, send them the chat history
+    socket.on('join', async ({ username }) => {
         console.log(`${username} joined the chat`);
 
-        socket.emit('message', { user: 'Chat info', text: `${username}", welcome to the chat!` });
-        socket.broadcast.emit('message', { user: 'Chat info', text: `${username} has joined the chat!` });
+        let messages = await Message.find(); // Fetch messages from the database
+        socket.emit('chat history', messages); // Send chat history to the new user
 
+        socket.emit('message', { user: 'Chat info', text: `${username}, welcome to the chat!` });
+        socket.broadcast.emit('message', { user: 'Chat info', text: `${username} has joined the chat!` });
     });
 
-    socket.on('sendMessage', (message) => {
-        io.emit('message', { user: message.user, text: message.text });
+    // When a user sends a message, save it in the database
+    socket.on('sendMessage', async (message) => {
+        let newMessage = new Message(message);
+        await newMessage.save(); // Save message to the database
 
+        io.emit('message', { user: message.user, text: message.text });
     });
 
     socket.on('disconnect', () => {
